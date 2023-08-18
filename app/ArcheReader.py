@@ -1,6 +1,6 @@
 import cv2
 from globals import *
-from utils import find_intersections, draw_squares
+from image_processing import findHoughPLine, getCroppedImage
 import numpy as np
 
 import threading
@@ -25,10 +25,7 @@ class ArcheReader:
   
   def init(self):
     # if test enabled, use static image
-    # thread = threading.Thread(target=self.run)
-    # thread.start()
     self.run()
-    # self.gui.run()
   
   def start_cam(self):
     # detect available cameras
@@ -53,10 +50,10 @@ class ArcheReader:
   def run(self):
     while True:
       # display image
+      self.create_gui()
       image = self.get_image()
       image = self.process_image(image)
       cv2.imshow('frame', image)
-      self.create_gui()
       if cv2.waitKey(1) & 0xFF == ord('q'):
         break
     # When everything done, release the capture
@@ -64,10 +61,12 @@ class ArcheReader:
     cv2.destroyAllWindows()
   
   def create_gui(self):
-    cv2.createTrackbar('threshold1', 'frame', self.threshold1, 255, self.on_change_threshold1)
-    cv2.createTrackbar('threshold2', 'frame', self.threshold2, 255, self.on_change_threshold2)
-    cv2.createTrackbar('minLineLength', 'frame', self.minLineLength, 1000, self.on_change_minLineLength)
-    cv2.createTrackbar('maxLineGap', 'frame', self.maxLineGap, 1000, self.on_change_maxLineGap)
+    cv2.namedWindow('controls')
+    cv2.createTrackbar('threshold1', 'controls', self.threshold1, 255, self.on_change_threshold1)
+    cv2.createTrackbar('threshold2', 'controls', self.threshold2, 255, self.on_change_threshold2)
+    cv2.createTrackbar('minLineLength', 'controls', self.minLineLength, 1000, self.on_change_minLineLength)
+    cv2.createTrackbar('maxLineGap', 'controls', self.maxLineGap, 1000, self.on_change_maxLineGap)
+    cv2.imshow("controls", np.zeros((500,500,3), np.uint8))
   
   def on_change_threshold1(self, value):
     self.threshold1 = value
@@ -87,42 +86,23 @@ class ArcheReader:
     # image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     image = raw_image.copy()
     
-    n = int(600 / 2)
-    # get center N, N square of image
-    height, width, ch = image.shape
+    cropped = getCroppedImage(image, 600)
     
-    img_out = raw_image.copy()
-    # CROP IMG 0UT 
-    img_out = img_out[int(height/2)-n:int(height/2)+n, int(width/2)-n:int(width/2)+n, :]
-        
+    # image out will use the cropped image
+    img_out = cropped.copy()
+
     # gray only from red channel
     gray = image[:,:,2]
-    
-     # get center N, N square of image
-    height, width, ch = image.shape    
-    cropped = gray[int(height/2)-n:int(height/2)+n, int(width/2)-n:int(width/2)+n]
-    
-    # decrease noise
-    
-    
-    # gray = cv2.cvtColor(raw_image, cv2.COLOR_BGR2GRAY)
-    
+        
     # Apply Gaussian blur to reduce noise and improve edge detection
-    # blurred = cv2.GaussianBlur(cropped, (7, 7), 0)
+    # blurred = cv2.GaussianBlur(cropped, (3, 3), 0)
     
     # decrease noise 
     denoised_frame = cv2.fastNlMeansDenoising(cropped, None,10,7,21)
     
-    # denoised_frame = cv2.fastNlMeansDenoising(cropped, None,10,7,21)
-
-    edges = cv2.Canny(denoised_frame, threshold1=self.threshold1, threshold2=self.threshold2)
-    
-    img_out = edges.copy()
-    # convert back to BGR
-    img_out = cv2.cvtColor(img_out, cv2.COLOR_GRAY2BGR)
-    
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50, minLineLength=self.minLineLength, maxLineGap=self.maxLineGap)
-    
+    # find lines
+    lines, edges = findHoughPLine(denoised_frame, self.threshold1, self.threshold2, self.minLineLength, self.maxLineGap)
+        
     if lines is not None:
       # draw_squares(img_out, find_intersections(lines), 50)
       for line in lines:

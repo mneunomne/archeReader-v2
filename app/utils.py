@@ -1,6 +1,5 @@
 import cv2 
 
-
 def list_ports():
     """
     Test the ports and returns a tuple with the available ports and the ones that are working.
@@ -26,24 +25,3 @@ def list_ports():
                 available_ports.append(dev_port)
         dev_port +=1
     return available_ports,working_ports,non_working_ports
-
-def find_intersections(lines):
-    intersections = []
-    for i in range(len(lines)):
-        for j in range(i + 1, len(lines)):
-            x1, y1, x2, y2 = lines[i][0]
-            x3, y3, x4, y4 = lines[j][0]
-            
-            det = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-            
-            if det != 0:  # Checking if lines are not parallel
-                intersection_x = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / det
-                intersection_y = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / det
-                intersections.append((int(intersection_x), int(intersection_y)))
-    return intersections
-
-def draw_squares(image, intersections, side_length):
-    for intersection in intersections:
-        x, y = intersection
-        half_side = side_length // 2
-        cv2.rectangle(image, (x - half_side, y - half_side), (x + half_side, y + half_side), (0, 255, 0), 2)
