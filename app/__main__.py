@@ -1,5 +1,6 @@
 import argparse
 from ArcheReader import ArcheReader
+from GUI import GUI
 # from socket_connection import connectSocket
 
 # parse arguments
@@ -14,11 +15,7 @@ test = args.test
 global capture
 
 capture = None
-
-archeReader = ArcheReader(test)
-
-def init():
-  # if test enabled, use static image
+  
+if __name__ == "__main__":
+  archeReader = ArcheReader(test)
   archeReader.run()
-
-init()
