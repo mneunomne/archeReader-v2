@@ -12,10 +12,13 @@ class ArcheReader:
   capture = None
   
   # default values for canny edge detection and hough lines
-  threshold1 = 41
-  threshold2 = 60
-  minLineLength = 50
-  maxLineGap = 100
+  threshold1 = 10
+  threshold2 = 19
+  minLineLength = 40
+  maxLineGap = 75
+  set_update= True
+  
+  crop_size = 200
   
   def __init__(self, test):
     self.test = test
@@ -48,12 +51,14 @@ class ArcheReader:
       print("Cannot open camera")
     
   def run(self):
+    self.create_gui()
     while True:
       # display image
-      self.create_gui()
-      image = self.get_image()
-      image = self.process_image(image)
-      cv2.imshow('frame', image)
+      if self.set_update:
+        image = self.get_image()
+        image = self.process_image(image)
+        cv2.imshow('frame', image)
+        self.set_update = False
       if cv2.waitKey(1) & 0xFF == ord('q'):
         break
     # When everything done, release the capture
@@ -69,15 +74,19 @@ class ArcheReader:
     cv2.imshow("controls", np.zeros((500,500,3), np.uint8))
   
   def on_change_threshold1(self, value):
+    self.set_update = True
     self.threshold1 = value
 
   def on_change_threshold2(self, value):
+    self.set_update = True
     self.threshold2 = value
 
   def on_change_minLineLength(self, value):
+    self.set_update = True
     self.minLineLength = value
 
   def on_change_maxLineGap(self, value):
+    self.set_update = True
     self.maxLineGap = value
 
   def process_image(self, raw_image):
@@ -86,7 +95,7 @@ class ArcheReader:
     # image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     image = raw_image.copy()
     
-    cropped = getCroppedImage(image, 240)
+    cropped = getCroppedImage(image, self.crop_size)
     
     # image out will use the cropped image
     img_out = cropped.copy()
@@ -111,40 +120,37 @@ class ArcheReader:
     vertical_lines = []
     
     if lines is not None:
-      lines = mergeLines(lines)
+      lines = remove_too_close_lines(lines)
       # squares = find_squares(lines)
       # draw_squares(img_out, find_intersections(lines), 50)
+      
+      horizontal_lines = filter_close_lines(filter_lines_by_angle(lines, 0, 5), 10)
+      vertical_lines = filter_close_lines(filter_lines_by_angle(lines, 90, 5), 10)
+      
+      if (len(vertical_lines) > 0):
+        vertical_lines = fill_vertical_lines(vertical_lines, self.crop_size)
+      
+      if (len(horizontal_lines) > 0):
+        horizontal_lines = fill_horizontal_lines(horizontal_lines, self.crop_size)
+      
+      # intersections = find_intersections2(horizontal_lines, vertical_lines)
+      
+      # smallest_distance = getSmallestDistanceBetweenPoints(intersections)
+      
+      # print("smallest_distance", smallest_distance)
+      #for point in intersections:
+      #    cv2.circle(img_out, point, 2, (0, 0, 255), -1)
+      
+      lines = horizontal_lines + vertical_lines
+      
       for line in lines:
         x1, y1, x2, y2 = line[0]
+        print("line", line)
         cv2.line(img_out, (x1, y1), (x2, y2), (0, 255, 0), 1)
       
-      longest_horizonta_line = getLongestHorizontalLine(lines)  
-      if longest_horizonta_line is not None:
-        horizontal_lines = makeGridFromHorizontalLine(longest_horizonta_line, 13, gray.shape)
-        if horizontal_lines is not None:
-          for line in horizontal_lines:
-            print(line)
-            x1, y1, x2, y2 = line[0]
-            cv2.line(img_out, (x1, y1), (x2, y2), (255, 0, 0), 2)
-        
-          # draw longest_horizonta_line 
-          x1, y1, x2, y2 = longest_horizonta_line[0]
-          cv2.line(img_out, (x1, y1), (x2, y2), (0, 0, 255), 2)
-      
-      logest_vertical_line = getLongestVerticalLine(lines)
-      if logest_vertical_line is not None:
-        vertical_lines = makeGridFromVerticalLine(logest_vertical_line, 13, gray.shape)
-        if vertical_lines is not None:
-          for line in vertical_lines:
-            print(line)
-            x1, y1, x2, y2 = line[0]
-            cv2.line(img_out, (x1, y1), (x2, y2), (255, 0, 0), 2)
-        
-          # draw logest_vertical_line 
-          x1, y1, x2, y2 = logest_vertical_line[0]
-          cv2.line(img_out, (x1, y1), (x2, y2), (0, 0, 255), 2)
       
       if len(horizontal_lines) > 0 and len(vertical_lines)> 0:
+        # find smallest distance between horizontal lines
         # Find intersection points
         intersection_points = []
         for h_line in horizontal_lines:
@@ -154,18 +160,30 @@ class ArcheReader:
                     intersection_points.append(intersection)
         # Draw intersection points
         for point in intersection_points:
-          cv2.circle(img_out, point, 3, (0, 0, 255), -1)
+          cv2.circle(img_out, point, 2, (0, 0, 255), -1)
+        
+        # make 4 sided polygon from each 4 neighboring intersection points
+        #polygons = create_rectangles(intersection_points)
+        # draw polygons
+        #for polygon in polygons:
+        #  print("polygon", polygon)
+        #  cv2.polylines(img_out, [polygon], True, (0, 255, 255), 1)
+
         
 
         
-    blur = cv2.medianBlur(gray, 9)
-    sharpen_kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-    sharpen = cv2.filter2D(blur, -1, sharpen_kernel)
+    #blur = cv2.medianBlur(gray, 9)
+    #sharpen_kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    #sharpen = cv2.filter2D(blur, -1, sharpen_kernel)
 
     # Threshold and morph close
-    thresh = cv2.threshold(sharpen, 150, 190, cv2.THRESH_BINARY_INV)[1]
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
-    close = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+    #thresh = cv2.threshold(sharpen, 150, 190, cv2.THRESH_BINARY_INV)[1]
+    #kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
+    #close = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+    
+    # find squares
+    #cnts = cv2.findContours(close, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
     
     
     # process image
