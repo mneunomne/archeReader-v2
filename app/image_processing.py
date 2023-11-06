@@ -296,7 +296,6 @@ def fill_horizontal_lines(horizontal_lines, img_width=200):
         gap = abs((y1 + y2) / 2 - (_y1 + _y2) / 2)
         
         lines_between = gap / smallest_gap
-        print("lines_between", lines_between, gap, smallest_gap)
         if lines_between > 1:
             step_size = gap / floor(lines_between)
             new_y1 = y1 + step_size

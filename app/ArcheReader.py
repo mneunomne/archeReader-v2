@@ -12,8 +12,8 @@ class ArcheReader:
   capture = None
   
   # default values for canny edge detection and hough lines
-  threshold1 = 10
-  threshold2 = 19
+  threshold1 = 7
+  threshold2 = 12
   minLineLength = 40
   maxLineGap = 75
   set_update= True
@@ -58,7 +58,7 @@ class ArcheReader:
         image = self.get_image()
         image = self.process_image(image)
         cv2.imshow('frame', image)
-        self.set_update = False
+        # self.set_update = False
       if cv2.waitKey(1) & 0xFF == ord('q'):
         break
     # When everything done, release the capture
@@ -95,23 +95,31 @@ class ArcheReader:
     # image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     image = raw_image.copy()
     
-    cropped = getCroppedImage(image, self.crop_size)
     
-    # image out will use the cropped image
-    img_out = cropped.copy()
+    
+    cropped = getCroppedImage(image, self.crop_size)
 
     # gray only from red channel
     gray = cropped[:,:,2]
 
+    # improve contrast
+    gray = cv2.equalizeHist(gray)
+    
     img_out = gray.copy()
     # make image colored
     img_out = cv2.cvtColor(img_out, cv2.COLOR_GRAY2BGR)
     
-    # Apply Gaussian blur to reduce noise and improve edge detection
-    # blurred = cv2.GaussianBlur(cropped, (3, 3), 0)
+    img = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
     
     # decrease noise 
     img = cv2.fastNlMeansDenoising(cropped, None,10,7,21)
+    
+    # Apply Gaussian blur to reduce noise and improve edge detection
+    img = cv2.GaussianBlur(img, (3, 3), 0)
+    
+    
+    # image out will use the cropped image
+    img_out = img.copy()
     
     # find lines
     lines, edges = findHoughPLine(img, self.threshold1, self.threshold2, self.minLineLength, self.maxLineGap)
@@ -145,7 +153,6 @@ class ArcheReader:
       
       for line in lines:
         x1, y1, x2, y2 = line[0]
-        print("line", line)
         cv2.line(img_out, (x1, y1), (x2, y2), (0, 255, 0), 1)
       
       
